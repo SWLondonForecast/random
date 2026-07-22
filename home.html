@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#10131f" />
+  <title>OrbitOS 1</title>
+  <style>
+    :root {
+      --accent: #8aa8ff;
+      --accent-2: #b58cff;
+      --glass: rgba(255, 255, 255, 0.16);
+      --glass-strong: rgba(255, 255, 255, 0.24);
+      --glass-border: rgba(255, 255, 255, 0.28);
+      --text: #ffffff;
+      --muted: rgba(255,255,255,.72);
+      --shadow: 0 24px 60px rgba(0,0,0,.35);
+      --blur: 24px;
+      --radius: 28px;
+      --wallpaper:
+        radial-gradient(circle at 20% 15%, rgba(103,124,255,.75), transparent 35%),
+        radial-gradient(circle at 85% 25%, rgba(211,91,255,.5), transparent 35%),
+        radial-gradient(circle at 50% 90%, rgba(21,211,196,.35), transparent 38%),
+        linear-gradient(145deg, #11152d 0%, #171a2e 48%, #0a1020 100%);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: #070914; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: var(--text); overflow: hidden; }
+    button, input, textarea { font: inherit; }
+
+    body {
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at 20% 20%, #222747 0, transparent 28%),
+        radial-gradient(circle at 80% 10%, #44265b 0, transparent 28%),
+        #080a11;
+    }
+
+    .phone-shell {
+      position: relative;
+      width: min(100vw, 430px);
+      height: min(100vh, 900px);
+      max-height: 100vh;
+      overflow: hidden;
+      background: var(--wallpaper);
+      box-shadow: 0 35px 100px rgba(0,0,0,.65);
+      isolation: isolate;
+    }
+
+    @media (min-width: 560px) {
+      .phone-shell {
+        height: min(92vh, 900px);
+        border-radius: 42px;
+        border: 8px solid #161820;
+      }
+    }
+
+    .wallpaper, .noise {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .wallpaper {
+      background: var(--wallpaper);
+      transition: background .35s ease;
+      z-index: -3;
+    }
+
+    .wallpaper::before,
+    .wallpaper::after {
+      content: "";
+      position: absolute;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      filter: blur(18px);
+      opacity: .45;
+      animation: floatOrb 10s ease-in-out infinite alternate;
+    }
+
+    .wallpaper::before { background: #7e71ff; top: -60px; left: -70px; }
+    .wallpaper::after { background: #ff6ddd; bottom: -80px; right: -60px; animation-delay: -4s; }
+
+    @keyframes floatOrb {
+      to { transform: translate(45px, 65px) scale(1.15); }
+    }
+
+    .noise {
+      opacity: .08;
+      z-index: -2;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.35'/%3E%3C/svg%3E");
+      mix-blend-mode: soft-light;
+    }
+
+    .glass {
+      background: linear-gradient(145deg, rgba(255,255,255,.22), rgba(255,255,255,.08));
+      border: 1px solid var(--glass-border);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.25), var(--shadow);
+      backdrop-filter: blur(var(--blur)) saturate(140%);
+      -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+    }
+
+    .status-bar {
+      position: absolute;
+      inset: 0 0 auto;
+      height: 44px;
+      padding: 12px 18px 0;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      z-index: 100;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .2px;
+      pointer-events: none;
+      text-shadow: 0 1px 8px rgba(0,0,0,.28);
+    }
+
+    .status-icons { display: flex; gap: 8px; align-items: center; }
+    .battery { width: 22px; height: 11px; border: 1.6px solid currentColor; border-radius: 3px; padding: 1px; position: relative; }
+    .battery::after { content:""; position:absolute; right:-3.4px; top:2.5px; width:2px; height:4px; border-radius:1px; background:currentColor; }
+    .battery-level { height:100%; width:78%; background:currentColor; border-radius:1px; }
+
+    .screen {
+      position: absolute;
+      inset: 0;
+      transition: transform .55s cubic-bezier(.2,.8,.2,1), opacity .4s ease;
+    }
+
+    .hidden-screen { opacity: 0; pointer-events: none; transform: scale(1.04); }
+
+    /* Lock screen */
+    #lockScreen {
+      z-index: 40;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 72px 20px 26px;
+      touch-action: none;
+    }
+
+    .lock-date { color: var(--muted); font-size: 18px; font-weight: 650; margin-top: 44px; }
+    .lock-time {
+      font-size: clamp(72px, 22vw, 104px);
+      line-height: .95;
+      font-weight: 280;
+      letter-spacing: -7px;
+      text-shadow: 0 8px 30px rgba(0,0,0,.24);
+    }
+
+    .lock-widget {
+      width: 100%;
+      margin-top: 34px;
+      border-radius: 24px;
+      padding: 16px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .weather-icon { font-size: 40px; }
+    .widget-title { font-weight: 800; }
+    .widget-sub { color: var(--muted); margin-top: 2px; font-size: 14px; }
+
+    .lock-spacer { flex: 1; }
+
+    .lock-actions { width: 100%; display: flex; justify-content: space-between; padding: 0 12px; margin-bottom: 24px; }
+    .round-action {
+      width: 50px; height: 50px; border-radius: 50%; border: 1px solid rgba(255,255,255,.25);
+      background: rgba(15,18,32,.33); color: white; font-size: 20px;
+      backdrop-filter: blur(16px); cursor: pointer;
+    }
+
+    .unlock-hint { font-size: 14px; color: var(--muted); font-weight: 700; animation: hint 1.8s infinite; }
+    .home-indicator { width: 130px; height: 5px; background: rgba(255,255,255,.92); border-radius: 99px; margin-top: 10px; }
+
+    @keyframes hint { 50% { transform: translateY(-5px); opacity: .7; } }
+
+    /* Home */
+    #homeScreen {
+      z-index: 10;
+      padding: 72px 18px 22px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .home-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .greeting { font-size: 30px; font-weight: 800; letter-spacing: -.8px; }
+    .mini-clock { color: var(--muted); font-size: 14px; margin-top: 2px; }
+
+    .profile-btn {
+      width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--glass-border);
+      background: linear-gradient(145deg, var(--accent), var(--accent-2));
+      color: white; font-weight: 900; cursor: pointer; box-shadow: var(--shadow);
+    }
+
+    .search {
+      border-radius: 20px; padding: 13px 16px; display: flex; gap: 10px; align-items: center;
+      margin-bottom: 18px;
+    }
+
+    .search input {
+      flex: 1; border: 0; outline: 0; color: white; background: transparent;
+    }
+    .search input::placeholder { color: rgba(255,255,255,.65); }
+
+    .apps-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px 12px;
+      align-content: start;
+    }
+
+    .app-icon-wrap { text-align: center; min-width: 0; }
+    .app-icon {
+      width: 62px; height: 62px; margin: 0 auto 7px; border: 1px solid rgba(255,255,255,.26);
+      border-radius: 20px; display: grid; place-items: center; font-size: 28px; cursor: pointer;
+      box-shadow: inset 0 1px rgba(255,255,255,.3), 0 10px 24px rgba(0,0,0,.2);
+      transition: transform .15s ease;
+      background: linear-gradient(145deg, rgba(255,255,255,.28), rgba(255,255,255,.1));
+      backdrop-filter: blur(18px);
+    }
+    .app-icon:active { transform: scale(.9); }
+    .app-label { font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-shadow: 0 1px 5px rgba(0,0,0,.45); }
+
+    .home-space { flex: 1; }
+
+    .dock {
+      border-radius: 28px; padding: 11px 10px;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+      margin-top: 16px;
+    }
+    .dock .app-label { display: none; }
+    .dock .app-icon { width: 58px; height: 58px; margin-bottom: 0; }
+
+    /* Apps */
+    .app-window {
+      z-index: 60;
+      background: rgba(10,13,24,.72);
+      backdrop-filter: blur(34px) saturate(145%);
+      transform: translateY(105%);
+      pointer-events: none;
+      opacity: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .app-window.open { transform: translateY(0); pointer-events: auto; opacity: 1; }
+
+    .app-topbar {
+      min-height: 66px;
+      padding: 24px 16px 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,.09);
+    }
+
+    .back-btn {
+      border: 0; color: white; background: rgba(255,255,255,.12);
+      width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 18px;
+    }
+
+    .app-title { font-size: 19px; font-weight: 850; }
+    .app-content { flex: 1; overflow: auto; padding: 16px; }
+
+    .list-card { border-radius: 22px; padding: 14px; margin-bottom: 12px; }
+    .row { display:flex; gap:12px; align-items:center; }
+    .avatar { width:46px; height:46px; border-radius:50%; display:grid; place-items:center; font-weight:900; background:linear-gradient(145deg,var(--accent),var(--accent-2)); flex:none; }
+    .row-main { flex:1; min-width:0; }
+    .row-title { font-weight:800; }
+    .row-sub { color:var(--muted); font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .row-time { color:var(--muted); font-size:12px; }
+
+    .chat-log { display:flex; flex-direction:column; gap:10px; padding-bottom:80px; }
+    .bubble { max-width:78%; padding:11px 13px; border-radius:18px; line-height:1.35; }
+    .bubble.them { align-self:flex-start; background:rgba(255,255,255,.14); }
+    .bubble.me { align-self:flex-end; background:linear-gradient(145deg,var(--accent),var(--accent-2)); }
+
+    .composer {
+      position:absolute; left:12px; right:12px; bottom:14px; padding:9px;
+      border-radius:22px; display:flex; gap:8px;
+    }
+    .composer input { flex:1; border:0; outline:0; background:transparent; color:white; padding:0 8px; }
+    .send-btn { border:0; border-radius:16px; padding:10px 14px; color:white; background:linear-gradient(145deg,var(--accent),var(--accent-2)); cursor:pointer; font-weight:800; }
+
+    .calc-display {
+      height:110px; display:flex; align-items:flex-end; justify-content:flex-end;
+      padding:18px; font-size:45px; font-weight:300; overflow:hidden;
+    }
+    .calc-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .calc-grid button { height:64px; border:1px solid rgba(255,255,255,.14); border-radius:20px; background:rgba(255,255,255,.1); color:white; font-size:22px; cursor:pointer; }
+    .calc-grid .accent { background:linear-gradient(145deg,var(--accent),var(--accent-2)); font-weight:800; }
+
+    textarea.notes {
+      width:100%; min-height:65vh; resize:none; border:1px solid rgba(255,255,255,.16);
+      border-radius:22px; padding:18px; color:white; background:rgba(255,255,255,.08); outline:none;
+    }
+
+    .setting-row { display:flex; justify-content:space-between; gap:14px; align-items:center; padding:15px 4px; border-bottom:1px solid rgba(255,255,255,.09); }
+    .switch { width:50px; height:29px; border-radius:999px; background:rgba(255,255,255,.17); padding:3px; cursor:pointer; transition:.2s; border:0; }
+    .switch::after { content:""; display:block; width:23px; height:23px; border-radius:50%; background:white; transition:.2s; }
+    .switch.on { background:var(--accent); }
+    .switch.on::after { transform:translateX(21px); }
+
+    .swatches { display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+    .swatch { width:36px; height:36px; border-radius:50%; border:2px solid rgba(255,255,255,.6); cursor:pointer; }
+
+    .camera-view {
+      height:100%; min-height:600px; border-radius:24px; position:relative; overflow:hidden;
+      background:
+        radial-gradient(circle at 60% 30%, rgba(255,255,255,.5), transparent 4%),
+        linear-gradient(160deg,#0d2632,#28445c 40%,#756153 75%,#2f2424);
+    }
+    .camera-view::before {
+      content:"OrbitOS Camera Preview";
+      position:absolute; inset:0; display:grid; place-items:center;
+      color:rgba(255,255,255,.55); font-size:20px; font-weight:800;
+    }
+    .shutter { position:absolute; bottom:28px; left:50%; transform:translateX(-50%); width:72px; height:72px; border-radius:50%; border:5px solid white; background:rgba(255,255,255,.25); cursor:pointer; }
+    .flash { position:absolute; inset:0; background:white; opacity:0; pointer-events:none; }
+    .flash.go { animation:flash .45s; }
+    @keyframes flash { 30% { opacity:1; } }
+
+    .gallery-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+    .photo { aspect-ratio:1; border-radius:20px; background-size:cover; background-position:center; border:1px solid rgba(255,255,255,.14); }
+
+    .store-hero { padding:24px; border-radius:26px; margin-bottom:16px; }
+    .store-hero h2 { margin:0 0 8px; font-size:27px; }
+    .primary-btn { border:0; border-radius:18px; padding:13px 17px; color:white; background:linear-gradient(145deg,var(--accent),var(--accent-2)); font-weight:850; cursor:pointer; }
+    .secondary-btn { border:1px solid rgba(255,255,255,.2); border-radius:18px; padding:13px 17px; color:white; background:rgba(255,255,255,.1); font-weight:800; cursor:pointer; }
+
+    .notification-panel {
+      position:absolute; z-index:90; inset:0; padding:54px 14px 18px;
+      background:rgba(8,10,18,.45); backdrop-filter:blur(30px);
+      transform:translateY(-105%); transition:.45s cubic-bezier(.2,.8,.2,1);
+    }
+    .notification-panel.open { transform:translateY(0); }
+    .quick-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+    .quick { aspect-ratio:1; border-radius:22px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.1); color:white; cursor:pointer; font-size:20px; }
+    .quick.on { background:linear-gradient(145deg,var(--accent),var(--accent-2)); }
+
+    .toast {
+      position:absolute; z-index:120; left:16px; right:16px; top:52px;
+      border-radius:22px; padding:14px 16px; transform:translateY(-140%);
+      transition:.4s cubic-bezier(.2,.8,.2,1);
+    }
+    .toast.show { transform:translateY(0); }
+
+    .boot {
+      position:absolute; z-index:200; inset:0; background:#070914; display:grid; place-items:center;
+      transition:opacity .8s ease, visibility .8s;
+    }
+    .boot.done { opacity:0; visibility:hidden; }
+    .orbit-logo { width:90px; height:90px; border-radius:50%; border:3px solid rgba(255,255,255,.75); position:relative; animation:spin 2s linear infinite; }
+    .orbit-logo::before { content:""; position:absolute; width:18px; height:18px; border-radius:50%; background:var(--accent); top:-8px; left:34px; box-shadow:0 0 25px var(--accent); }
+    .boot-title { text-align:center; margin-top:22px; font-weight:850; letter-spacing:4px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    .dimmed .wallpaper { filter:brightness(.62); }
+    .reduce-glass { --glass-border: rgba(255,255,255,.14); --blur: 8px; }
+  </style>
+</head>
+<body>
+  <main class="phone-shell" id="phone">
+    <div class="wallpaper"></div>
+    <div class="noise"></div>
+
+    <div class="boot" id="bootScreen">
+      <div>
+        <div class="orbit-logo"></div>
+        <div class="boot-title">ORBITOS 1</div>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusTime">00:00</span>
+      <div class="status-icons">
+        <span>▮▮▮</span><span>⌁</span>
+        <div class="battery"><div class="battery-level"></div></div>
+      </div>
+    </div>
+
+    <section class="screen" id="lockScreen">
+      <div class="lock-date" id="lockDate">Thursday, 23 July</div>
+      <div class="lock-time" id="lockTime">00:00</div>
+
+      <div class="lock-widget glass">
+        <div class="weather-icon">☁️</div>
+        <div>
+          <div class="widget-title">18° · Mostly cloudy</div>
+          <div class="widget-sub">Orbit Weather · Tap after unlocking</div>
+        </div>
+      </div>
+
+      <div class="lock-spacer"></div>
+      <div class="lock-actions">
+        <button class="round-action" onclick="showToast('Torch toggled')">🔦</button>
+        <button class="round-action" onclick="unlock(); openApp('cameraApp')">📷</button>
+      </div>
+      <div class="unlock-hint">⌃ Swipe up to unlock</div>
+      <div class="home-indicator"></div>
+    </section>
+
+    <section class="screen hidden-screen" id="homeScreen">
+      <header class="home-header">
+        <div>
+          <div class="greeting">Good evening</div>
+          <div class="mini-clock" id="homeDate">OrbitOS 1</div>
+        </div>
+        <button class="profile-btn" onclick="openApp('settingsApp')">O</button>
+      </header>
+
+      <label class="search glass">
+        <span>⌕</span>
+        <input id="appSearch" placeholder="Search OrbitOS" oninput="filterApps(this.value)" />
+      </label>
+
+      <div class="apps-grid" id="appsGrid">
+        <div class="app-icon-wrap searchable" data-name="messages">
+          <button class="app-icon" onclick="openApp('messagesApp')">💬</button><div class="app-label">Messages</div>
+        </div>
+        <div class="app-icon-wrap searchable" data-name="orbit store play store apps">
+          <button class="app-icon" onclick="openApp('storeApp')">▶️</button><div class="app-label">Play Store</div>
+        </div>
+        <div class="app-icon-wrap searchable" data-name="camera">
+          <button class="app-icon" onclick="openApp('cameraApp')">📷</button><div class="app-label">Camera</div>
+        </div>
+        <div class="app-icon-wrap searchable" data-name="gallery photos">
+          <button class="app-icon" onclick="openApp('galleryApp')">🖼️</button><div class="app-label">Gallery</div>
+        </div>
+        <div class="app-icon-wrap searchable" data-name="weather">
+          <button class="app-icon" onclick="openApp('weatherApp')">🌦️</button><div class="app-label">Weather</div>
+        </div>
+        <div class="app-icon-wrap searchable" data-name="notes">
+          <button class="app-icon" onclick="openApp('notesApp')">📝</button><div class="app-label">Notes</div>
+        </div>
+        <div class="app-icon-wrap searchable" data-name="calculator">
+          <button class="app-icon" onclick="openApp('calculatorApp')">🧮</button><div class="app-label">Calculator</div>
+        </div>
+        <div class="app-icon-wrap searchable" data-name="settings">
+          <button class="app-icon" onclick="openApp('settingsApp')">⚙️</button><div class="app-label">Settings</div>
+        </div>
+      </div>
+
+      <div class="home-space"></div>
+
+      <div class="dock glass">
+        <div class="app-icon-wrap"><button class="app-icon" onclick="openApp('phoneApp')">📞</button><div class="app-label">Phone</div></div>
+        <div class="app-icon-wrap"><button class="app-icon" onclick="openApp('messagesApp')">💬</button><div class="app-label">Messages</div></div>
+        <div class="app-icon-wrap"><button class="app-icon" onclick="openApp('browserApp')">🌐</button><div class="app-label">Browser</div></div>
+        <div class="app-icon-wrap"><button class="app-icon" onclick="openApp('cameraApp')">📷</button><div class="app-label">Camera</div></div>
+      </div>
+      <div class="home-indicator" style="align-self:center"></div>
+    </section>
+
+    <!-- Messages -->
+    <section class="screen app-window" id="messagesApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('messagesApp')">‹</button><div class="app-title">Messages</div></div>
+      <div class="app-content" style="position:relative">
+        <div class="chat-log" id="chatLog">
+          <div class="bubble them">Welcome to OrbitOS 1 👋</div>
+          <div class="bubble them">This Messages app already works.</div>
+          <div class="bubble me">That looks amazing!</div>
+        </div>
+        <div class="composer glass">
+          <input id="messageInput" placeholder="Message" onkeydown="if(event.key==='Enter') sendMessage()" />
+          <button class="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Store -->
+    <section class="screen app-window" id="storeApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('storeApp')">‹</button><div class="app-title">Play Store</div></div>
+      <div class="app-content">
+        <div class="store-hero glass">
+          <h2>Apps for your Android device</h2>
+          <p style="color:var(--muted)">Open the official Google Play website in a new tab.</p>
+          <button class="primary-btn" onclick="openPlayStore()">Open Google Play</button>
+        </div>
+        <div class="list-card glass">
+          <div class="row">
+            <div class="avatar">O</div>
+            <div class="row-main"><div class="row-title">Orbit Notes+</div><div class="row-sub">Demo OrbitOS app</div></div>
+            <button class="secondary-btn" id="installBtn" onclick="installDemoApp()">Install</button>
+          </div>
+        </div>
+        <p style="color:var(--muted);font-size:13px;line-height:1.5">
+          A website cannot detect or import Android apps installed from Google Play into this browser-based phone. OrbitOS can still simulate its own installable web apps later.
+        </p>
+      </div>
+    </section>
+
+    <!-- Camera -->
+    <section class="screen app-window" id="cameraApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('cameraApp')">‹</button><div class="app-title">Camera</div></div>
+      <div class="app-content">
+        <div class="camera-view">
+          <div class="flash" id="flash"></div>
+          <button class="shutter" onclick="takePhoto()"></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Gallery -->
+    <section class="screen app-window" id="galleryApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('galleryApp')">‹</button><div class="app-title">Gallery</div></div>
+      <div class="app-content">
+        <div class="gallery-grid" id="galleryGrid">
+          <div class="photo" style="background:linear-gradient(145deg,#7a6cff,#ff75cb)"></div>
+          <div class="photo" style="background:linear-gradient(145deg,#22b8cf,#173f5f)"></div>
+          <div class="photo" style="background:linear-gradient(145deg,#ffd166,#ef476f)"></div>
+          <div class="photo" style="background:linear-gradient(145deg,#8ac926,#1982c4)"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Weather -->
+    <section class="screen app-window" id="weatherApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('weatherApp')">‹</button><div class="app-title">Weather</div></div>
+      <div class="app-content">
+        <div class="store-hero glass">
+          <div style="font-size:60px">☁️</div>
+          <h2 style="font-size:48px;margin:5px 0">18°</h2>
+          <div style="font-size:20px;font-weight:800">Mostly cloudy</div>
+          <div style="color:var(--muted);margin-top:5px">High 21° · Low 14°</div>
+        </div>
+        <div class="list-card glass"><div class="row"><span>19:00</span><div class="row-main"></div><span>☁️ 18°</span></div></div>
+        <div class="list-card glass"><div class="row"><span>20:00</span><div class="row-main"></div><span>🌙 17°</span></div></div>
+        <div class="list-card glass"><div class="row"><span>21:00</span><div class="row-main"></div><span>🌙 16°</span></div></div>
+      </div>
+    </section>
+
+    <!-- Notes -->
+    <section class="screen app-window" id="notesApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('notesApp')">‹</button><div class="app-title">Notes</div></div>
+      <div class="app-content">
+        <textarea class="notes" id="notesText" placeholder="Write something..." oninput="localStorage.setItem('orbitNotes',this.value)"></textarea>
+      </div>
+    </section>
+
+    <!-- Calculator -->
+    <section class="screen app-window" id="calculatorApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('calculatorApp')">‹</button><div class="app-title">Calculator</div></div>
+      <div class="app-content">
+        <div class="calc-display glass" id="calcDisplay">0</div>
+        <div class="calc-grid" style="margin-top:12px">
+          <button onclick="calcClear()">C</button><button onclick="calcInput('(')">(</button><button onclick="calcInput(')')">)</button><button class="accent" onclick="calcInput('/')">÷</button>
+          <button onclick="calcInput('7')">7</button><button onclick="calcInput('8')">8</button><button onclick="calcInput('9')">9</button><button class="accent" onclick="calcInput('*')">×</button>
+          <button onclick="calcInput('4')">4</button><button onclick="calcInput('5')">5</button><button onclick="calcInput('6')">6</button><button class="accent" onclick="calcInput('-')">−</button>
+          <button onclick="calcInput('1')">1</button><button onclick="calcInput('2')">2</button><button onclick="calcInput('3')">3</button><button class="accent" onclick="calcInput('+')">+</button>
+          <button onclick="calcInput('0')" style="grid-column:span 2">0</button><button onclick="calcInput('.')">.</button><button class="accent" onclick="calcEquals()">=</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section class="screen app-window" id="settingsApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('settingsApp')">‹</button><div class="app-title">Settings</div></div>
+      <div class="app-content">
+        <div class="list-card glass">
+          <div class="row"><div class="avatar">O</div><div><div class="row-title">OrbitOS User</div><div class="row-sub">OrbitOS 1 · Browser Edition</div></div></div>
+        </div>
+        <div class="list-card glass">
+          <div class="setting-row"><span>Darken wallpaper</span><button class="switch" onclick="toggleSwitch(this,'dimmed')"></button></div>
+          <div class="setting-row"><span>Reduce glass blur</span><button class="switch" onclick="toggleSwitch(this,'reduce-glass')"></button></div>
+          <div style="padding:14px 4px 4px">
+            <div class="row-title">Accent colour</div>
+            <div class="swatches">
+              <button class="swatch" style="background:#8aa8ff" onclick="setAccent('#8aa8ff','#b58cff')"></button>
+              <button class="swatch" style="background:#ff79b0" onclick="setAccent('#ff79b0','#ff9d62')"></button>
+              <button class="swatch" style="background:#32d6b2" onclick="setAccent('#32d6b2','#31a8ff')"></button>
+              <button class="swatch" style="background:#ffd166" onclick="setAccent('#ffd166','#ef476f')"></button>
+            </div>
+          </div>
+        </div>
+        <button class="secondary-btn" onclick="lockPhone()" style="width:100%">Lock OrbitOS</button>
+      </div>
+    </section>
+
+    <!-- Phone -->
+    <section class="screen app-window" id="phoneApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('phoneApp')">‹</button><div class="app-title">Phone</div></div>
+      <div class="app-content">
+        <div class="calc-display glass" id="dialDisplay" style="font-size:34px;align-items:center;justify-content:center">Enter number</div>
+        <div class="calc-grid" style="grid-template-columns:repeat(3,1fr);margin-top:14px">
+          <button onclick="dial('1')">1</button><button onclick="dial('2')">2</button><button onclick="dial('3')">3</button>
+          <button onclick="dial('4')">4</button><button onclick="dial('5')">5</button><button onclick="dial('6')">6</button>
+          <button onclick="dial('7')">7</button><button onclick="dial('8')">8</button><button onclick="dial('9')">9</button>
+          <button onclick="dial('*')">*</button><button onclick="dial('0')">0</button><button onclick="dial('#')">#</button>
+        </div>
+        <button class="primary-btn" style="width:100%;margin-top:14px" onclick="showToast('Demo call started')">📞 Call</button>
+      </div>
+    </section>
+
+    <!-- Browser -->
+    <section class="screen app-window" id="browserApp">
+      <div class="app-topbar"><button class="back-btn" onclick="closeApp('browserApp')">‹</button><div class="app-title">Orbit Browser</div></div>
+      <div class="app-content">
+        <div class="search glass"><span>🌐</span><input id="browserInput" placeholder="Search or enter website" onkeydown="if(event.key==='Enter') browse()" /></div>
+        <div class="store-hero glass">
+          <h2>Welcome to Orbit Browser</h2>
+          <p style="color:var(--muted)">Enter a search or website above. It will open in a new tab.</p>
+          <button class="primary-btn" onclick="document.getElementById('browserInput').focus()">Start browsing</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="notification-panel" id="notificationPanel">
+      <div class="quick-grid">
+        <button class="quick on" onclick="this.classList.toggle('on')">📶</button>
+        <button class="quick on" onclick="this.classList.toggle('on')">⌁</button>
+        <button class="quick" onclick="this.classList.toggle('on')">✈️</button>
+        <button class="quick" onclick="this.classList.toggle('on')">🔦</button>
+      </div>
+      <div class="list-card glass"><div class="row"><div class="avatar">O</div><div><div class="row-title">OrbitOS 1</div><div class="row-sub">Your phone UI is ready.</div></div></div></div>
+      <button class="secondary-btn" style="width:100%" onclick="toggleNotifications(false)">Close</button>
+    </aside>
+
+    <div class="toast glass" id="toast">Done</div>
+  </main>
+
+  <script>
+    const phone = document.getElementById('phone');
+    const lockScreen = document.getElementById('lockScreen');
+    const homeScreen = document.getElementById('homeScreen');
+    const toast = document.getElementById('toast');
+    let unlocked = false;
+    let touchStartY = 0;
+    let calcValue = '';
+    let dialValue = '';
+
+    setTimeout(() => document.getElementById('bootScreen').classList.add('done'), 1500);
+
+    function updateClock() {
+      const now = new Date();
+      const time = now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      document.getElementById('statusTime').textContent = time;
+      document.getElementById('lockTime').textContent = time;
+      document.getElementById('lockDate').textContent = now.toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'});
+      document.getElementById('homeDate').textContent = now.toLocaleDateString([], {weekday:'long', day:'numeric', month:'long'});
+      const hour = now.getHours();
+      document.querySelector('.greeting').textContent = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+
+    function unlock() {
+      unlocked = true;
+      lockScreen.classList.add('hidden-screen');
+      homeScreen.classList.remove('hidden-screen');
+      showToast('Welcome to OrbitOS 1');
+    }
+
+    function lockPhone() {
+      document.querySelectorAll('.app-window.open').forEach(app => app.classList.remove('open'));
+      homeScreen.classList.add('hidden-screen');
+      lockScreen.classList.remove('hidden-screen');
+      unlocked = false;
+    }
+
+    lockScreen.addEventListener('touchstart', e => touchStartY = e.touches[0].clientY, {passive:true});
+    lockScreen.addEventListener('touchend', e => {
+      if (touchStartY - e.changedTouches[0].clientY > 55) unlock();
+    }, {passive:true});
+    lockScreen.addEventListener('wheel', e => { if (e.deltaY > 20) unlock(); });
+    lockScreen.addEventListener('dblclick', unlock);
+
+    function openApp(id) {
+      if (!unlocked) return;
+      document.getElementById(id).classList.add('open');
+    }
+    function closeApp(id) { document.getElementById(id).classList.remove('open'); }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(window.toastTimer);
+      window.toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const text = input.value.trim();
+      if (!text) return;
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble me';
+      bubble.textContent = text;
+      document.getElementById('chatLog').appendChild(bubble);
+      input.value = '';
+      bubble.scrollIntoView({behavior:'smooth'});
+      setTimeout(() => {
+        const reply = document.createElement('div');
+        reply.className = 'bubble them';
+        reply.textContent = 'Orbit assistant: Message received!';
+        document.getElementById('chatLog').appendChild(reply);
+        reply.scrollIntoView({behavior:'smooth'});
+      }, 650);
+    }
+
+    function openPlayStore() {
+      window.open('https://play.google.com/store/apps', '_blank', 'noopener,noreferrer');
+    }
+
+    function installDemoApp() {
+      const btn = document.getElementById('installBtn');
+      btn.textContent = 'Installed';
+      btn.disabled = true;
+      if (!document.querySelector('[data-name="orbit notes plus"]')) {
+        const item = document.createElement('div');
+        item.className = 'app-icon-wrap searchable';
+        item.dataset.name = 'orbit notes plus';
+        item.innerHTML = '<button class="app-icon" onclick="openApp(\\'notesApp\\')">✨</button><div class="app-label">Notes+</div>';
+        document.getElementById('appsGrid').appendChild(item);
+      }
+      localStorage.setItem('orbitDemoInstalled','yes');
+      showToast('Orbit Notes+ installed');
+    }
+
+    function takePhoto() {
+      const flash = document.getElementById('flash');
+      flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
+      const photo = document.createElement('div');
+      photo.className = 'photo';
+      const hue = Math.floor(Math.random()*360);
+      photo.style.background = `linear-gradient(145deg,hsl(${hue} 80% 60%),hsl(${(hue+85)%360} 75% 35%))`;
+      document.getElementById('galleryGrid').prepend(photo);
+      showToast('Photo saved to Gallery');
+    }
+
+    function calcInput(char) {
+      calcValue += char;
+      document.getElementById('calcDisplay').textContent = calcValue;
+    }
+    function calcClear() { calcValue=''; document.getElementById('calcDisplay').textContent='0'; }
+    function calcEquals() {
+      try {
+        if (!/^[0-9+\-*/().\s]+$/.test(calcValue)) throw new Error();
+        calcValue = String(Function('"use strict";return (' + calcValue + ')')());
+        document.getElementById('calcDisplay').textContent = calcValue;
+      } catch { document.getElementById('calcDisplay').textContent = 'Error'; calcValue=''; }
+    }
+
+    function toggleSwitch(btn, cls) {
+      btn.classList.toggle('on');
+      phone.classList.toggle(cls);
+    }
+
+    function setAccent(a,b) {
+      document.documentElement.style.setProperty('--accent',a);
+      document.documentElement.style.setProperty('--accent-2',b);
+      localStorage.setItem('orbitAccent', JSON.stringify([a,b]));
+      showToast('Accent colour changed');
+    }
+
+    function dial(n) {
+      dialValue += n;
+      document.getElementById('dialDisplay').textContent = dialValue;
+    }
+
+    function browse() {
+      let q = document.getElementById('browserInput').value.trim();
+      if (!q) return;
+      const looksLikeUrl = q.includes('.') && !q.includes(' ');
+      const target = looksLikeUrl ? (q.startsWith('http') ? q : 'https://' + q) : 'https://www.google.com/search?q=' + encodeURIComponent(q);
+      window.open(target, '_blank', 'noopener,noreferrer');
+    }
+
+    function filterApps(value) {
+      const q = value.toLowerCase();
+      document.querySelectorAll('.searchable').forEach(el => {
+        el.style.display = el.dataset.name.includes(q) ? '' : 'none';
+      });
+    }
+
+    function toggleNotifications(force) {
+      const panel = document.getElementById('notificationPanel');
+      if (force === false) panel.classList.remove('open');
+      else panel.classList.toggle('open');
+    }
+
+    let panelStart = 0;
+    phone.addEventListener('touchstart', e => {
+      if (unlocked && e.touches[0].clientY < 60) panelStart = e.touches[0].clientY;
+    }, {passive:true});
+    phone.addEventListener('touchend', e => {
+      if (panelStart && e.changedTouches[0].clientY - panelStart > 70) toggleNotifications();
+      panelStart = 0;
+    }, {passive:true});
+
+    document.getElementById('notesText').value = localStorage.getItem('orbitNotes') || '';
+
+    const accent = JSON.parse(localStorage.getItem('orbitAccent') || 'null');
+    if (accent) setAccent(accent[0], accent[1]);
+
+    if (localStorage.getItem('orbitDemoInstalled') === 'yes') installDemoApp();
+  </script>
+</body>
+</html>

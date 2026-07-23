@@ -372,13 +372,6 @@
     <div class="wallpaper"></div>
     <div class="noise"></div>
 
-    <div class="boot" id="bootScreen">
-      <div>
-        <div class="orbit-logo"></div>
-        <div class="boot-title">ORBITOS 1</div>
-      </div>
-    </div>
-
     <div class="status-bar">
       <span id="statusTime">00:00</span>
       <div class="status-icons">
@@ -636,8 +629,6 @@
     let touchStartY = 0;
     let calcValue = '';
     let dialValue = '';
-
-    setTimeout(() => document.getElementById('bootScreen').classList.add('done'), 1500);
 
     function updateClock() {
       const now = new Date();
